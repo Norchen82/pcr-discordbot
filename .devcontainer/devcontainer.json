@@ -2,9 +2,9 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/go
 {
   "name": "python",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
   "customizations": {
     "vscode": {
       "extensions": [
