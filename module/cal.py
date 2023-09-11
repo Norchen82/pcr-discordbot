@@ -1,12 +1,17 @@
+"""
+This module contains functions for performing mathematical operations.
+"""
+
 import re
 
+# The definitions of mathematical symbol
 PLUS = '+'
 MINUS = '-'
 MULT = '*'
 DIV = '/'
 
 def compile(string):
-    """Parse the string and return its calculation result."""
+    """Calculate the expression and return the result."""
     return expr(string)
 
 
@@ -18,25 +23,25 @@ def expr(string):
     operators = r"\+|\-"
     matches = re.finditer(operators, string)
 
-    result = 0
-    op = add
-    begins = 0
+    result = 0 # The calculation result
+    operation = add # The mathematical operation, default as add()
+    prev = 0 # The previous index of the matched operator
     for match in matches:
         idx = match.start()
 
         try:
-            result = op(result, term(string[begins:idx]))
-            op = expr_operation(string[idx])
-            begins = idx + 1
+            result = operation(result, term(string[prev:idx]))
+            operation = expr_operation(string[idx])
+            prev = idx + 1
         except:
             pass
 
-    result = op(result, term(string[begins:]))
+    result = operation(result, term(string[prev:]))
     return result
 
 
 def expr_operation(operator):
-    """Return the valid expression operation base on the given operator."""
+    """Get the valid expression operation base on the given operator."""
     if operator == PLUS:
         return add
     elif operator == MINUS:
@@ -53,25 +58,25 @@ def term(string):
     operators = r"\*|\/"
     matches = re.finditer(operators, string)
 
-    result = 0
-    op = add
-    begins = 0
+    result = 0 # The calculation result
+    operation = add # The mathematical operation, default as add()
+    prev = 0 # The previous index of the matched operator
     for match in matches:
         idx = match.start()
 
         try:
-            result = op(result, factor(string[begins:idx]))
-            op = term_operation(string[idx])
-            begins = idx + 1
+            result = operation(result, factor(string[prev:idx]))
+            operation = term_operation(string[idx])
+            prev = idx + 1
         except:
             pass
 
-    result = op(result, factor(string[begins:]))
+    result = operation(result, factor(string[prev:]))
     return result
 
 
 def term_operation(operator):
-    """Return the valid term operation base on the given operator."""
+    """Get the valid term operation base on the given operator."""
     if operator == MULT:
         return mutiply
     elif operator == DIV:
