@@ -3,6 +3,8 @@ import discord
 from discord import app_commands
 import module.cal as cal
 import module.msg as msg
+import module.types as types
+import re
 
 bot_token = os.getenv("BOT_TOKEN")
 guild_id = os.getenv("GUILD_ID")
@@ -29,34 +31,54 @@ async def command_cal(ctx: discord.Interaction, expr: str, desc: str = ""):
     """
     Calculate the expression and send the result to the user.
     """
-    result = cal.compile(expr)
-    message = f"{expr} = {result} {desc}".strip()
-    await msg.reply_with_message(ctx, message)  
+    try:
+        result = cal.compile(expr)
+        message = f"{expr} = {result} {desc}".strip()
+        await msg.reply_with_message(ctx, message) 
+    except:
+        await ctx.response.send_message(f'"{expr}"不是一個有效的運算式。', ephemeral=True, delete_after=5)
+
 
 @tree.command(name="go", description="【報刀用指令】根據預估傷害計算BOSS的剩餘血量。", guild=discord.Object(id=guild_id))
 @app_commands.describe(value="請輸入你本次出刀預估的傷害量。", desc="請輸入想在運算結果後面的附加訊息。例如:等合")
 @app_commands.rename(value="預估傷害", desc="附加訊息")
 async def command_go(ctx: discord.Interaction, value: str, desc: str = ""):
     """
-    Retrieve the boss's remaining health points from the latest message in the channel,
+    Retrieve the boss remaining health points from the latest message in the channel,
     subtract the estimated damage points, and send the result to the user.
     """
-    last_message = ctx.channel.last_message
-    if last_message != None:
-        tokens = last_message.content.split("校正")
-        if len(tokens) <= 1:
-            tokens = last_message.content.split("=")
+    try:
+        if not types.is_integer(value):
+            await msg.reply_error(ctx, f'預估傷害必須是整數，**{value}**不是一個有效的整數。')
+            return
+        
+        # Ensure the estimated damage will never be negative.
+        estimated_damage = value
+        if estimated_damage.startswith("-"):
+            estimated_damage = estimated_damage[1:]
 
-        remaining = tokens[-1].strip()
+        last_message = ctx.channel.last_message
+        if last_message != None:
+            # Separate boss remaining health from the lastest message.
+            pattern = r"\=|(校正(為)?(：|:)?)|(剩(下)?)"
+            parts = re.split(pattern, last_message.content)
+            remaining_health = cal.compile(parts[-1].strip())
+            if remaining_health <= 0:
+                await msg.reply_error(ctx, f'偵測到BOSS血量低於0，請透過**\cal**指令重新計算血量。')
+                return
+        
+            # Calculate result of `Boss remaining health` - `Estimated damage`
+            expr = f"{remaining_health} - {estimated_damage}"
+            result = cal.compile(expr)
 
-        expr = f"{remaining} - {value}"
-        result = cal.compile(expr)
+            message = f"{expr} = {result} {desc}".strip()
+            await msg.reply_with_message(ctx, message)  
+            return
+        
+        raise Exception("Cannot fetch last message")
+    except:
+        await msg.reply_error(ctx, f"無法自動偵測BOSS的剩餘血量，請使用**\cal**指令來計算血量。")
 
-        message = f"{expr} = {result} {desc}".strip()
-        await msg.reply_with_message(ctx, message)  
-        return
-    
-    await ctx.response.send_message("[錯誤] 無法自動偵測BOSS的剩餘血量，無法計算。(此訊息將在數秒後自動刪除)", ephemeral=True, delete_after=5)
 
 @tree.command(name="fixh", description="【報刀用指令】校正BOSS的血量。", guild=discord.Object(id=guild_id))
 @app_commands.describe(value="請輸入校正後的血量。")
@@ -65,9 +87,22 @@ async def command_fixh(ctx: discord.Interaction, value: str):
     """
     Update the boss's health points with a fixed value.
     """
+    if not types.is_integer(value):
+        await msg.reply_error(ctx, f'校正血量必須是正整數，**{value}**不是一個有效的整數。')
+        return
+
     result = int(value)
+    if result <= 0:
+        await msg.reply_error(ctx, f'校正血量必須是正整數，**{value}**不是一個有效的整數。')
+        return
+
+    if result > 10000:
+        await msg.reply_error(ctx, f'BOSS血量不能超過1億。')
+        return
+
     message = f"校正{result}"
     await msg.reply_with_message(ctx, message)
+
 
 
 client.run(bot_token)

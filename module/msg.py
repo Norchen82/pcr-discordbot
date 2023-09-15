@@ -5,6 +5,10 @@ This module contains functions to interact with Discord message system.
 import discord
 from discord import Member, User
 
+# The time for the error message to live
+ERROR_DISPLAY_TIME = 5
+
+
 async def reply_with_message(ctx: discord.Interaction, content: str):
     """
     Reply to the user's command with a standard message.
@@ -19,6 +23,20 @@ async def reply_with_message(ctx: discord.Interaction, content: str):
     # Send the calculation result with normal message
     await ctx.channel.send(content=message, silent=True)
     
+
+async def reply_error(ctx: discord.Interaction, error_message: str):
+    """
+    Provide the error message to the user.
+    (Only the user who initiated the interaction will be able to see the error message.)
+    """
+    if error_message == "":
+        error_message = "發生未預期錯誤。"
+
+
+    content = f"[錯誤] {error_message}"
+    await ctx.response.send_message(content, ephemeral=True, delete_after=ERROR_DISPLAY_TIME)
+
+
 def mention(user: User|Member):
     """
     Get the syntax for mentioning the specified user.
