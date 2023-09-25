@@ -42,3 +42,11 @@ def mention(user: User|Member):
     Get the syntax for mentioning the specified user.
     """
     return f"<@{user.id}>"
+
+
+async def last_message(ctx: discord.Interaction):
+    if ctx.channel.last_message != None:
+        return ctx.channel.last_message
+    
+    histories = [history async for history in ctx.channel.history(limit=1)]
+    return histories[0]

@@ -35,7 +35,8 @@ async def command_cal(ctx: discord.Interaction, expr: str, desc: str = ""):
         result = cal.compile(expr)
         message = f"{expr}={result} {desc}".strip()
         await msg.reply_with_message(ctx, message) 
-    except:
+    except Exception as ex:
+        print(f"expr={expr}, desc={desc}, ex={ex}")
         await ctx.response.send_message(f'"{expr}"不是一個有效的運算式。', ephemeral=True, delete_after=5)
 
 
@@ -48,7 +49,7 @@ async def command_go(ctx: discord.Interaction, value: str, desc: str = ""):
     subtract the estimated damage points, and send the result to the user.
     """
     try:
-        last_message = ctx.channel.last_message
+        last_message = await msg.last_message(ctx)
         if last_message != None:
             # Separate boss remaining health from the lastest message.
             pattern = r"\=|(校正(為)?(：|:)?)|(剩(下)?)"
@@ -72,7 +73,8 @@ async def command_go(ctx: discord.Interaction, value: str, desc: str = ""):
             return
         
         raise Exception("Cannot fetch last message")
-    except:
+    except Exception as ex:
+        print(f"value={value}, desc={desc}, ex={ex}")
         await msg.reply_error(ctx, f"無法自動偵測BOSS的剩餘血量，請使用**/cal**指令來計算血量。")
 
 client.run(bot_token)
