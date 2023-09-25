@@ -79,30 +79,4 @@ async def command_go(ctx: discord.Interaction, value: str, desc: str = ""):
     except:
         await msg.reply_error(ctx, f"無法自動偵測BOSS的剩餘血量，請使用**\cal**指令來計算血量。")
 
-
-@tree.command(name="fixh", description="【報刀用指令】校正BOSS的血量。", guild=discord.Object(id=guild_id))
-@app_commands.describe(value="請輸入校正後的血量。")
-@app_commands.rename(value="校正血量")
-async def command_fixh(ctx: discord.Interaction, value: str):
-    """
-    Update the boss's health points with a fixed value.
-    """
-    if not types.is_integer(value):
-        await msg.reply_error(ctx, f'校正血量必須是正整數，**{value}**不是一個有效的整數。')
-        return
-
-    result = int(value)
-    if result <= 0:
-        await msg.reply_error(ctx, f'校正血量必須是正整數，**{value}**不是一個有效的整數。')
-        return
-
-    if result > 10000:
-        await msg.reply_error(ctx, f'BOSS血量不能超過1億。')
-        return
-
-    message = f"校正{result}"
-    await msg.reply_with_message(ctx, message)
-
-
-
 client.run(bot_token)
