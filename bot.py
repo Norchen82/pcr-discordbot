@@ -33,7 +33,7 @@ async def command_cal(ctx: discord.Interaction, expr: str, desc: str = ""):
     """
     try:
         result = cal.compile(expr)
-        message = f"{expr} = {result} {desc}".strip()
+        message = f"{expr}={result} {desc}".strip()
         await msg.reply_with_message(ctx, message) 
     except:
         await ctx.response.send_message(f'"{expr}"不是一個有效的運算式。', ephemeral=True, delete_after=5)
@@ -48,15 +48,6 @@ async def command_go(ctx: discord.Interaction, value: str, desc: str = ""):
     subtract the estimated damage points, and send the result to the user.
     """
     try:
-        if not types.is_integer(value):
-            await msg.reply_error(ctx, f'預估傷害必須是整數，**{value}**不是一個有效的整數。')
-            return
-        
-        # Ensure the estimated damage will never be negative.
-        estimated_damage = value
-        if estimated_damage.startswith("-"):
-            estimated_damage = estimated_damage[1:]
-
         last_message = ctx.channel.last_message
         if last_message != None:
             # Separate boss remaining health from the lastest message.
@@ -64,19 +55,24 @@ async def command_go(ctx: discord.Interaction, value: str, desc: str = ""):
             parts = re.split(pattern, last_message.content)
             remaining_health = cal.compile(parts[-1].strip())
             if remaining_health <= 0:
-                await msg.reply_error(ctx, f'偵測到BOSS血量低於0，請透過**\cal**指令重新計算血量。')
+                await msg.reply_error(ctx, f'偵測到BOSS血量低於0，請透過**/cal**指令重新計算血量。')
                 return
         
-            # Calculate result of `Boss remaining health` - `Estimated damage`
-            expr = f"{remaining_health} - {estimated_damage}"
+            # If the estimated damage does not start with minus symbol, insert one at the beginning.
+            estimated_damage = value.strip()
+            if not estimated_damage.startswith("-"):
+                estimated_damage = "-" + estimated_damage
+
+            # Calculate result of `Boss remaining health` - `Estimated damage`.
+            expr = f"{remaining_health}{estimated_damage}"
             result = cal.compile(expr)
 
-            message = f"{expr} = {result} {desc}".strip()
+            message = f"{expr}={result} {desc}".strip()
             await msg.reply_with_message(ctx, message)  
             return
         
         raise Exception("Cannot fetch last message")
     except:
-        await msg.reply_error(ctx, f"無法自動偵測BOSS的剩餘血量，請使用**\cal**指令來計算血量。")
+        await msg.reply_error(ctx, f"無法自動偵測BOSS的剩餘血量，請使用**/cal**指令來計算血量。")
 
 client.run(bot_token)
