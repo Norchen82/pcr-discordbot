@@ -2,6 +2,7 @@
 This module contains functions to interact with Discord message system.
 """
 
+import re
 import discord
 from discord import Member, User
 
@@ -49,4 +50,11 @@ async def last_message(ctx: discord.Interaction):
         return ctx.channel.last_message
     
     histories = [history async for history in ctx.channel.history(limit=1)]
+    if len(histories) == 0:
+        return None
     return histories[0]
+
+
+def is_round_divider(message: str):
+    pattern = r"^(=|-)+\s*\d*\s*(=|-)+$"
+    return re.match(pattern, message)
