@@ -39,13 +39,23 @@ boss_title = {
     5: "五王",
 }
 
-master_id = int(os.getenv("MASTER_ID"))
+master_id: int
+role_ids: list[str]
+rold_names: list[str]
+role_choices: list = []
 
-role_ids = os.getenv("ROLE_ID").split(",")
-role_names = os.getenv("ROLE_NAME").split(",")
-role_choices = []
-for index, role_id in enumerate(role_ids):
-    role_choices.append(app_commands.Choice(name=role_names[index], value=role_ids[index]))
+def load_master_id():
+    env_value = os.getenv("MASTER_ID")
+    if env_value != None and env_value != "":
+        master_id = int(env_value)
+
+def load_role():
+    id_value = os.getenv("ROLE_ID")
+    if id_value != None and id_value != "":
+        role_ids = id_value.split(",")
+        role_names = os.getenv("ROLE_NAME").split(",")
+        for index, role_id in enumerate(role_ids):
+            role_choices.append(app_commands.Choice(name=role_names[index], value=role_ids[index]))
 
 class History:
     def __init__(self, member_id: int, histories: list):
@@ -208,6 +218,8 @@ async def command_history(ctx: discord.Interaction, role: app_commands.Choice[st
     except Exception as ex:
         print(ex, flush=True)
         await ctx.response.send_message(content="輸入錯誤，請檢查日期格式是否正確", ephemeral=True, delete_after=3)
-        
+
+load_master_id()  
+load_role()
 client.run(bot_token)
 
