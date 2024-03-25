@@ -128,7 +128,7 @@ async def command_go(ctx: discord.Interaction, value: str, desc: str = ""):
     try:
         last_message = await msg.last_message(ctx)
         if last_message != None:
-            content = last_message.content
+            content = last_message.content.split("\n")[-1]
             remaining_health = 0
             if msg.is_round_divider(content):
                 remaining_health = boss_health[ctx.channel.id]
