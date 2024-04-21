@@ -5,13 +5,18 @@ from discord import app_commands
 import module.cal as cal
 import module.msg as msg
 import module.broadcast as broadcast
+import module.env as env
+import module.perm as perm
+import module.atkcheckin as atkcheckin
 import re
 from datetime import datetime, timedelta
 import pytz
+import urllib.parse
+
+import commands.rm as rm
 
 bot_token = os.getenv("BOT_TOKEN")
 guild_id = os.getenv("GUILD_ID")
-
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -21,60 +26,13 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 guild = client.get_guild(int(guild_id))
-
-# Bind the health to the boss channel
-boss_health = {}
-for index in range(0, 6):
-    key = os.getenv(f"BOSS{index}_CHANNEL")
-    if key == None or key == "":
-        continue
-
-    channel_ids = key.split(",")
-    for id in channel_ids:
-        boss_health[int(id)] = int(os.getenv(f"BOSS{index}_HEALTH"))
-
-boss_title = {
-    1: "一王",
-    2: "二王",
-    3: "三王",
-    4: "四王",
-    5: "五王",
-}
-
-master_id: int = None
-dev_id: int = None
-role_ids: list[str]
-rold_names: list[str]
 role_choices: list = []
 
 
-def load_master_id():
-    global master_id
-
-    env_value = os.getenv("MASTER_ID")
-    if env_value != None and env_value != "":
-        master_id = int(env_value)
-
-
-def load_dev_id():
-    global dev_id
-
-    env_value = os.getenv("DEV_ID")
-    if env_value != None and env_value != "":
-        dev_id = int(env_value)
-
-
-def load_role():
-    global role_ids, role_names, role_choices
-
-    id_value = os.getenv("ROLE_ID")
-    if id_value != None and id_value != "":
-        role_ids = id_value.split(",")
-        role_names = os.getenv("ROLE_NAME").split(",")
-        for index, role_id in enumerate(role_ids):
-            role_choices.append(
-                app_commands.Choice(name=role_names[index], value=role_ids[index])
-            )
+def init_role_choices():
+    global role_choices
+    for role in env.get_roles():
+        role_choices.append(app_commands.Choice(name=role.name, value=role.id))
 
 
 class History:
@@ -85,17 +43,55 @@ class History:
 
 @client.event
 async def on_ready():
-    load_master_id()
-    load_dev_id()
-    load_role()
+    env.init(client)
+    init_role_choices()
 
     await tree.sync(guild=discord.Object(id=guild_id))
     print(f"Logged on as {client.user}")
 
 
-@tree.command(name="cal", description="簡易計算機，支援四則運算", guild=discord.Object(id=guild_id))
+# 報刀佇列
+queue = {}
+
+
+@client.event
+async def on_message(message: discord.Message):
+    try:
+        if message.author == client.user:
+            return
+
+        # 如果非報刀區的頻道，就不處理
+        if env.get_boss_health(message.channel.id) == None:
+            return
+
+        # 將訊息以行為單位進行處理
+        message_lines = message.content.split("\n")
+
+        # 如果是報刀訊息，就進行報刀動作
+        if atkcheckin.is_command(message_lines):
+            option = atkcheckin.AttackCheckinOption(
+                command_lines=message_lines,
+                command_id=message.id,
+                caller_id=message.author.id,
+                boss_id=message.channel.id,
+            )
+            reader = msg.DiscordTextChannelReader(message.channel)
+            writer = msg.DiscordMessageWriter(message)
+            await atkcheckin.do_command(option=option, reader=reader, writer=writer)
+
+    except Exception as ex:
+        print(ex)
+        pass
+
+
+@tree.command(
+    name="cal",
+    description="簡易計算機，支援四則運算",
+    guild=discord.Object(id=guild_id),
+)
 @app_commands.describe(
-    expr="請輸入數學算式，不要包含等號。例如:24000-4800", desc="請輸入想在運算結果後面的附加訊息。例如:等合"
+    expr="請輸入數學算式，不要包含等號。例如:24000-4800",
+    desc="請輸入想在運算結果後面的附加訊息。例如:等合",
 )
 @app_commands.rename(expr="運算式", desc="附加訊息")
 async def command_cal(ctx: discord.Interaction, expr: str, desc: str = ""):
@@ -115,83 +111,45 @@ async def command_cal(ctx: discord.Interaction, expr: str, desc: str = ""):
 
 @tree.command(
     name="go",
-    description="【報刀用指令】根據預估傷害計算BOSS的剩餘血量。",
+    description="【已棄用】請直接在報刀區輸入預估傷害。",
     guild=discord.Object(id=guild_id),
 )
-@app_commands.describe(value="請輸入你本次出刀預估的傷害量。", desc="請輸入想在運算結果後面的附加訊息。例如:等合")
+@app_commands.describe(
+    value="請輸入你本次出刀預估的傷害量。",
+    desc="請輸入想在運算結果後面的附加訊息。例如:等合",
+)
 @app_commands.rename(value="預估傷害", desc="附加訊息")
 async def command_go(ctx: discord.Interaction, value: str, desc: str = ""):
     """
+    @deprecated
     Retrieve the boss remaining health points from the latest message in the channel,
     subtract the estimated damage points, and send the result to the user.
     """
     try:
-        last_message = await msg.last_message(ctx)
-        if last_message != None:
-            content = last_message.content.split("\n")[-1]
-            remaining_health = 0
-            if msg.is_round_divider(content):
-                remaining_health = boss_health[ctx.channel.id]
-            else:
-                # Separate boss remaining health from the lastest message.
-                pattern = r"\=|(校正(為)?(：|:)?)|(剩(下)?)|※"
-                parts = re.split(pattern, content)
-                remaining_health = cal.compile(parts[-1].strip())
-                if remaining_health <= 0:
-                    await msg.reply_error(ctx, f"偵測到BOSS血量低於0，請透過**/cal**指令重新計算血量。")
-                    return
+        # If the estimated damage does not start with minus symbol, insert one at the beginning.
+        estimated_damage = value.strip()
+        if not estimated_damage.startswith("-"):
+            estimated_damage = "-" + estimated_damage
 
-            # If the estimated damage does not start with minus symbol, insert one at the beginning.
-            estimated_damage = value.strip()
-            if not estimated_damage.startswith("-"):
-                estimated_damage = "-" + estimated_damage
+        if not re.match(r"\-\d+", estimated_damage):
+            raise Exception("Invalid estimated damage.")
 
-            # Calculate result of `Boss remaining health` - `Estimated damage`.
-            expr = f"{remaining_health}{estimated_damage}"
-            result = cal.compile(expr)
-
-            message = f"{expr}={result} {desc}".strip()
-            await msg.reply_with_message(ctx, message)
-            return
-
-        raise Exception("Cannot fetch last message")
+        await ctx.response.send_message(
+            f"go指令已棄用，請直接在報刀區輸入「{estimated_damage}」。",
+            ephemeral=True,
+            delete_after=5,
+        )
     except Exception as ex:
-        print(f"value={value}, desc={desc}, ex={ex}")
-        await msg.reply_error(ctx, f"無法自動偵測BOSS的剩餘血量，請使用**/cal**指令來計算血量。")
+        await msg.reply_error(ctx, "預估傷害不正確。")
 
 
 @tree.command(
-    name="rm", description="【報刀用指令】刪除你本週次出的最後一個刀。", guild=discord.Object(id=guild_id)
+    name="rm",
+    description="【報刀用指令】刪除你本週次出的最後一個刀。",
+    guild=discord.Object(id=guild_id),
 )
-async def command_rm(ctx: discord.Interaction):
-    try:
-        last_attack = None
-
-        async for history in ctx.channel.history(limit=10):
-            content = history.content
-            if msg.is_round_divider(
-                content
-            ):  # Reach the beginning of the current round, stop iterating.
-                break
-            elif (
-                content.startswith(msg.mention(ctx.user))
-                and history.author.id == client.user.id
-            ):  # Found the last attack of the current user, stop iterating.
-                last_attack = history
-                break
-
-        # The current user haven't make any attack yet.
-        if last_attack == None:
-            await msg.reply_error(ctx, f"本週次您尚未出刀。")
-            return
-
-        # Send an empty message and delete it instantly, so the user won't see any message
-        await ctx.response.send_message(content="** **", ephemeral=True, delete_after=0)
-
-        await last_attack.delete()
-    except Exception as ex:
-        print(f"rm: error with {ex}")
-        pass
+async def command_rm(itr: discord.Interaction):
+    await rm.do_command(itr)
 
 
 @tree.command(
@@ -220,7 +178,7 @@ async def command_history(
         for member in drole.members:
             histories[member.id] = [0, 0, 0, 0, 0]
 
-        histories[master_id] = [0, 0, 0, 0, 0]
+        histories[env.get_master_id()] = [0, 0, 0, 0, 0]
 
         for index in range(1, 6):
             channel_ids = os.getenv(f"BOSS{index}_CHANNEL").split(",")
@@ -277,8 +235,10 @@ async def command_history(
 @app_commands.rename(channel="頻道")
 async def command_broadcast_add(ctx: discord.Interaction, channel: discord.TextChannel):
     try:
-        if ctx.user.id != master_id and ctx.user.id != dev_id:
-            await ctx.response.send_message(content="你沒有權限使用此指令", ephemeral=True)
+        if not perm.is_admin(ctx.user.id):
+            await ctx.response.send_message(
+                content="你沒有權限使用此指令", ephemeral=True
+            )
             return
 
         broadcast.add_channel(channel.guild.id, channel.id)
@@ -299,8 +259,10 @@ async def command_broadcast_add(ctx: discord.Interaction, channel: discord.TextC
 @app_commands.rename(channel="頻道")
 async def command_broadcast_rm(ctx: discord.Interaction, channel: discord.TextChannel):
     try:
-        if ctx.user.id != master_id and ctx.user.id != dev_id:
-            await ctx.response.send_message(content="你沒有權限使用此指令", ephemeral=True)
+        if not perm.is_admin(ctx.user.id):
+            await ctx.response.send_message(
+                content="你沒有權限使用此指令", ephemeral=True
+            )
             return
 
         broadcast.delete_channel(channel.guild.id, channel.id)
@@ -319,8 +281,10 @@ async def command_broadcast_rm(ctx: discord.Interaction, channel: discord.TextCh
 )
 async def command_broadcast_list(ctx: discord.Interaction):
     try:
-        if ctx.user.id != master_id and ctx.user.id != dev_id:
-            await ctx.response.send_message(content="你沒有權限使用此指令", ephemeral=True)
+        if not perm.is_admin(ctx.user.id):
+            await ctx.response.send_message(
+                content="你沒有權限使用此指令", ephemeral=True
+            )
             return
 
         channel_names = ""
@@ -333,7 +297,9 @@ async def command_broadcast_list(ctx: discord.Interaction):
             channel_names += channel.name + "\n"
 
         if channel_names == "":
-            await ctx.response.send_message(content="目前廣播指令尚未綁定任何頻道", ephemeral=True)
+            await ctx.response.send_message(
+                content="目前廣播指令尚未綁定任何頻道", ephemeral=True
+            )
         else:
             await ctx.response.send_message(
                 content=f"目前綁定的頻道有：\n{channel_names}", ephemeral=True
@@ -352,13 +318,18 @@ async def command_broadcast_list(ctx: discord.Interaction):
 @app_commands.rename(message="訊息內容")
 async def command_broadcast(ctx: discord.Interaction, message: str):
     try:
-        if ctx.user.id != master_id and ctx.user.id != dev_id:
-            await ctx.response.send_message(content="你沒有權限使用此指令", ephemeral=True)
+        if not perm.is_admin(ctx.user.id):
+            await ctx.response.send_message(
+                content="你沒有權限使用此指令", ephemeral=True
+            )
             return
 
         targets = broadcast.get_broadcast_targets()
         if len(targets) == 0:
-            await ctx.response.send_message("目前廣播指令尚未綁定任何頻道，請先使用**/broadcast_add**指令來綁定頻道。", ephemeral=True)
+            await ctx.response.send_message(
+                "目前廣播指令尚未綁定任何頻道，請先使用**/broadcast_add**指令來綁定頻道。",
+                ephemeral=True,
+            )
             return
 
         view = discord.ui.View()
@@ -396,12 +367,46 @@ async def command_broadcast(ctx: discord.Interaction, message: str):
         print(ex, flush=True)
         await msg.reply_error(ctx, "發生未知錯誤")
 
+
 async def confirm_broadcast(ctx: discord.Interaction, message: str):
     await ctx.delete_original_response()
     await broadcast.broadcast(client, message)
 
+
 async def cancel_broadcast(ctx: discord.Interaction):
     await ctx.delete_original_response()
+
+
+@tree.command(
+    name="img",
+    description="根據傳入的時間軸，產生隊伍角色的圖片。",
+    guild=discord.Object(id=guild_id),
+)
+async def command_img(ctx: discord.Interaction):
+    await ctx.response.send_modal(GenPicModal())
+
+
+class GenPicModal(discord.ui.Modal, title="產生隊伍角色圖片"):
+    timeline = discord.ui.TextInput(
+        label="時間軸",
+        placeholder="請輸入時間軸",
+        required=True,
+        style=discord.TextStyle.paragraph,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        tl = urllib.parse.quote(self.timeline.value)
+        url = f"[隊伍圖片連結]({env.get_website_url()}?tl={tl})"
+        await interaction.response.send_message(url, ephemeral=True)
+
+    async def on_error(
+        self, interaction: discord.Interaction, error: Exception
+    ) -> None:
+        await interaction.response.send_message(
+            "發生錯誤，請聯繫管理員", ephemeral=True
+        )
+
+        print(error)
 
 
 client.run(bot_token)

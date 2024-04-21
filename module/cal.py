@@ -5,10 +5,14 @@ This module contains functions for performing mathematical operations.
 import re
 
 # The definitions of mathematical symbol
-PLUS = '+'
-MINUS = '-'
-MULT = '*'
-DIV = '/'
+PLUS = "+"
+MINUS = "-"
+DIV = "/"
+
+
+def is_mult(op: str):
+    return op == "*" or op == "X" or op == "x"
+
 
 def compile(string):
     """Calculate the expression and return the result."""
@@ -23,9 +27,9 @@ def expr(string):
     operators = r"\+|\-"
     matches = re.finditer(operators, string)
 
-    result = 0 # The calculation result
-    operation = add # The mathematical operation, default as add()
-    prev = 0 # The previous index of the matched operator
+    result = 0  # The calculation result
+    operation = add  # The mathematical operation, default as add()
+    prev = 0  # The previous index of the matched operator
     for match in matches:
         idx = match.start()
 
@@ -55,12 +59,12 @@ def term(string):
     Perform term calculation:
     `<term> ::= <factor> { [*,/] <factor> }`.
     """
-    operators = r"\*|\/"
+    operators = r"X|x|\*|\/"
     matches = re.finditer(operators, string)
 
-    result = 0 # The calculation result
-    operation = add # The mathematical operation, default as add()
-    prev = 0 # The previous index of the matched operator
+    result = 0  # The calculation result
+    operation = add  # The mathematical operation, default as add()
+    prev = 0  # The previous index of the matched operator
     for match in matches:
         idx = match.start()
 
@@ -77,7 +81,7 @@ def term(string):
 
 def term_operation(operator):
     """Get the valid term operation base on the given operator."""
-    if operator == MULT:
+    if is_mult(operator):
         return mutiply
     elif operator == DIV:
         return divide
