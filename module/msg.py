@@ -153,7 +153,7 @@ async def get_round_lines(reader: MessageReader, ignores: list[Message]) -> list
     """
     round_lines = None
 
-    messages = [history for history in await reader.read_all(limit=10)]
+    messages = [history for history in await reader.read_all(limit=20)]
     break_all = False
 
     for message in messages:

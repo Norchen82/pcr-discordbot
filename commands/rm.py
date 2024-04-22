@@ -106,7 +106,7 @@ async def do_command(itr: Interaction):
         caller = itr.user
 
         messages = []
-        async for history in itr.channel.history(limit=10):
+        async for history in itr.channel.history(limit=20):
             content = history.content
 
             # 遇到周次分隔線，停止動作
