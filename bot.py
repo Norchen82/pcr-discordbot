@@ -149,7 +149,10 @@ async def command_go(ctx: discord.Interaction, value: str, desc: str = ""):
     guild=discord.Object(id=guild_id),
 )
 async def command_rm(itr: discord.Interaction):
-    await rm.do_command(itr)
+    try:
+        await rm.do_command(itr)
+    except Exception as ex:
+        await itr.response.edit_message(content="發生錯誤", view=None, delete_after=5)
 
 
 @tree.command(

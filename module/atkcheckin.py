@@ -84,6 +84,16 @@ def pop_checkin_queue(group_id: int):
     checkin_queue[group_id].pop(0)
 
 
+def get_checkin_queue(group_id: int):
+    """
+    取得報刀佇列。
+    """
+    if group_id not in checkin_queue:
+        return []
+
+    return checkin_queue[group_id]
+
+
 def is_current_checkin(unique_id: str, group_id: int) -> bool:
     """
     判斷報刀訊息是否為當前報刀
@@ -194,7 +204,7 @@ async def do_command(
                 estimated_damage = re.sub(r"\-", "+", estimated_damage)
 
             max_health = env.get_boss_health(boss_id)
-            lines = await msg.get_round_lines(reader, checkin_queue[boss_id])
+            lines = await msg.get_round_lines(reader, get_checkin_queue(boss_id))
             if lines == None:
                 raise Exception("No round lines found.")
 
@@ -248,8 +258,8 @@ async def do_command(
                         await writer.delete_by_id(message.id)
 
             if option.reverse:
-                return
+                raise ex
 
             if is_current_checkin(queue_key, boss_id):
                 pop_checkin_queue(boss_id)
-            pass
+            raise ex

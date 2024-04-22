@@ -15,6 +15,8 @@ from module.atkcheckin import (
     sub_estimated_damage,
 )
 
+rm_queue = []
+
 
 class RmView(View):
     def __init__(self, caller, messages):
@@ -73,29 +75,62 @@ class RmView(View):
         await itr.response.edit_message(view=self)
 
     async def on_delete(self, itr: Interaction):
-        message = await itr.channel.fetch_message(int(self.selected_id))
-        content = message.content
+        global rm_queue
 
-        # 擷取預估傷害的部分
-        estimated_damage = sub_estimated_damage(content)
+        message_id = None
+        try:
+            message = await itr.channel.fetch_message(int(self.selected_id))
+            message_id = message.id
 
-        # 將原本的預估傷害補回
-        await do_atkcheckin(
-            option=AttackCheckinOption(
-                command_lines=[estimated_damage],
-                command_id=message.id,
-                caller_id=itr.user.id,
-                boss_id=itr.channel_id,
-                reverse=True,
-            ),
-            reader=DiscordTextChannelReader(itr.channel),
-            writer=DiscordTextChannelWriter(itr.channel),
-        )
+            content = message.content
 
-        # 將原報刀訊息標記為刪除
-        await message.edit(content=f"~~{content}~~")
+            # 若該報刀紀錄已經被刪除，則不處理
+            if message.content.startswith("~~") and message.content.endswith("~~"):
+                await itr.response.edit_message(
+                    content="[錯誤] 報刀紀錄已經被刪除。", view=None, delete_after=5
+                )
+                return
 
-        await itr.response.edit_message(content="** **", view=None, delete_after=0)
+            if rm_queue.count(message.id) > 0:
+                await itr.response.edit_message(
+                    content="[錯誤] 報刀紀錄已經被刪除。", view=None, delete_after=5
+                )
+                return
+
+            # 將訊息標記為待刪除
+            rm_queue.append(message_id)
+
+            # 擷取預估傷害的部分
+            estimated_damage = sub_estimated_damage(content)
+
+            # 將原本的預估傷害補回
+            await do_atkcheckin(
+                option=AttackCheckinOption(
+                    command_lines=[estimated_damage],
+                    command_id=message.id,
+                    caller_id=itr.user.id,
+                    boss_id=itr.channel_id,
+                    reverse=True,
+                ),
+                reader=DiscordTextChannelReader(itr.channel),
+                writer=DiscordTextChannelWriter(itr.channel),
+            )
+
+            # 將原報刀訊息標記為刪除
+            await message.edit(content=f"~~{content}~~")
+
+            # 將回應訊息刪除
+            await itr.response.edit_message(content="** **", view=None, delete_after=0)
+
+            # 將訊息從待刪除清單中移除
+            rm_queue.remove(message_id)
+        except Exception as ex:
+            print(ex)
+
+            if message_id != None:
+                rm_queue.remove(message_id)
+
+            raise ex
 
 
 async def do_command(itr: Interaction):
