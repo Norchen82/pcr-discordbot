@@ -258,6 +258,37 @@ class DoCommandTest(unittest.TestCase):
             ],
         )
 
+    def test_multiply(self):
+        """
+        測試報刀指令中有乘法的狀況
+        """
+        option = command_option(
+            command_lines=[
+                "-1000x2",
+                "-1000*3  - 500-  2000X2",
+                "-500  x 2",
+            ]
+        )
+        reader = FakeMessageReader(
+            messages=[
+                message_from_caller(content="-500  x 2"),
+                message_from_caller(content="-1000*3  - 500-  2000X2"),
+                message_from_caller(content="-1000x2"),
+                *MULTIPLE_HISTORIES,
+            ]
+        )
+        writer = FakeMessageWriter(channel_id=CHANNEL_ID, reader=reader)
+
+        asyncio.run(atkcheckin.do_command(option, reader, writer))
+        self.assertEqual(
+            writer.messages,
+            [
+                f"<@{CALLER_ID}> 15800-1000x2=13800",
+                f"<@{CALLER_ID}> 13800-1000*3-500-2000X2=6300",
+                f"<@{CALLER_ID}> 6300-500x2=5300",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

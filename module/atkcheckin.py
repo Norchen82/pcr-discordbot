@@ -6,8 +6,8 @@ import module.cal as cal
 from typing import List
 
 COMMAND_PATTERN = r"^(\-[^\-\=\d]*\d+)"
-DAMAGE_PATTERN = r"(\-[^\-\=\d]*\d+([xX\*]\d+)?)"
-DAMAGE_PATTERN_FOR_SPLIT = r"(?:\-[^\-\=\d]*\d+(?:[xX\*]\d+)?)"
+DAMAGE_PATTERN = r"(\-[^\-\=\d]*\d+(\s*[xX\*]\s*\d+)?)"
+DAMAGE_PATTERN_FOR_SPLIT = r"(?:\-[^\-\=\d]*\d+(?:\s*[xX\*]\s*\d+)?)"
 PURE_DAMAGE_PATTERN = r"[^xX\*\-\d]"
 
 checkin_queue = {}
@@ -176,11 +176,14 @@ async def do_command(
 
             # 從報刀訊息中取得所有的預估傷害
             damage_strings = re.findall(DAMAGE_PATTERN, line)
-            damage_strings = [damage[0] for damage in damage_strings]
+            damage_strings = [
+                re.sub(r"\s", "", damage[0].strip()) for damage in damage_strings
+            ]
 
             # 將所有的預估傷害轉換成純數字格式
             pure_damages = [
-                re.sub(PURE_DAMAGE_PATTERN, "", damage) for damage in damage_strings
+                re.sub(PURE_DAMAGE_PATTERN, "", damage.strip())
+                for damage in damage_strings
             ]
 
             # 處理過往訊息
