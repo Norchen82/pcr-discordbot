@@ -1,5 +1,13 @@
 import re
-from discord import ButtonStyle, SelectOption, Interaction
+from discord import (
+    ButtonStyle,
+    SelectOption,
+    Interaction,
+    Message,
+    TextChannel,
+    User,
+    Member,
+)
 from discord.ui import Select, Button, View
 from module.msg import (
     is_round_divider,
@@ -8,24 +16,24 @@ from module.msg import (
     DiscordTextChannelWriter,
     DiscordTextChannelReader,
 )
-from module.env import bot_client_id
 from module.atkcheckin import (
     do_command as do_atkcheckin,
     AttackCheckinOption,
     sub_estimated_damage,
 )
+import module.bot as bot
 
-rm_queue = []
+rm_queue: list[int] = []
 
 
 class RmView(View):
-    def __init__(self, caller, messages):
+    def __init__(self, caller: User | Member, messages: list[Message]):
         super().__init__()
         self.caller = caller
         self.messages = messages
-        self.selected_id = None
-        self.select = None
-        self.delete_btn = None
+        self.selected_id: str | None = None
+        self.select: Select[RmView] | None = None
+        self.delete_btn: Button[RmView] | None = None
 
         self.render_components()
 
@@ -37,9 +45,9 @@ class RmView(View):
         if self.select != None:
             self.remove_item(self.select)
 
-        options = []
+        options: list[SelectOption] = []
         for message in self.messages:
-            content = re.sub(mention(self.caller), "", message.content)
+            content: str = re.sub(mention(self.caller), "", message.content)
             value = str(message.id)
             is_default = value == self.selected_id
             options.append(SelectOption(label=content, value=value, default=is_default))
@@ -49,7 +57,8 @@ class RmView(View):
             options=options,
             custom_id="rm_select",
         )
-        self.select.values.append(self.selected_id)
+        if self.selected_id != None:
+            self.select.values.append(self.selected_id)
         self.select.callback = self.on_select
         self.add_item(self.select)
 
@@ -68,31 +77,39 @@ class RmView(View):
         self.delete_btn.callback = self.on_delete
         self.add_item(self.delete_btn)
 
-    async def on_select(self, itr: Interaction):
+    async def on_select(self, interaction: Interaction):
+        if self.select == None:
+            return
+
         self.selected_id = self.select.values[0]
         self.render_components()
 
-        await itr.response.edit_message(view=self)
+        await interaction.response.edit_message(view=self)
 
-    async def on_delete(self, itr: Interaction):
+    async def on_delete(self, interaction: Interaction):
+        if self.selected_id == None:
+            return
+        if interaction.channel == None or type(interaction.channel) is not TextChannel:
+            return
+
         global rm_queue
 
         message_id = None
         try:
-            message = await itr.channel.fetch_message(int(self.selected_id))
+            message = await interaction.channel.fetch_message(int(self.selected_id))
             message_id = message.id
 
             content = message.content
 
             # 若該報刀紀錄已經被刪除，則不處理
             if message.content.startswith("~~") and message.content.endswith("~~"):
-                await itr.response.edit_message(
+                await interaction.response.edit_message(
                     content="[錯誤] 報刀紀錄已經被刪除。", view=None, delete_after=5
                 )
                 return
 
             if rm_queue.count(message.id) > 0:
-                await itr.response.edit_message(
+                await interaction.response.edit_message(
                     content="[錯誤] 報刀紀錄已經被刪除。", view=None, delete_after=5
                 )
                 return
@@ -108,19 +125,21 @@ class RmView(View):
                 option=AttackCheckinOption(
                     command_lines=[estimated_damage],
                     command_id=message.id,
-                    caller_id=itr.user.id,
-                    boss_id=itr.channel_id,
+                    caller_id=interaction.user.id,
+                    boss_id=interaction.channel.id,
                     reverse=True,
                 ),
-                reader=DiscordTextChannelReader(itr.channel),
-                writer=DiscordTextChannelWriter(itr.channel),
+                reader=DiscordTextChannelReader(interaction.channel),
+                writer=DiscordTextChannelWriter(interaction.channel),
             )
 
             # 將原報刀訊息標記為刪除
             await message.edit(content=f"~~{content}~~")
 
             # 將回應訊息刪除
-            await itr.response.edit_message(content="** **", view=None, delete_after=0)
+            await interaction.response.edit_message(
+                content="** **", view=None, delete_after=0
+            )
 
             # 將訊息從待刪除清單中移除
             rm_queue.remove(message_id)
@@ -133,15 +152,18 @@ class RmView(View):
             raise ex
 
 
-async def do_command(itr: Interaction):
+async def do_command(interaction: Interaction):
     """
     處理刪除報刀的指令
     """
-    try:
-        caller = itr.user
+    if interaction.channel == None or type(interaction.channel) is not TextChannel:
+        raise Exception("rm指令只允許在文字頻道中執行。")
 
-        messages = []
-        async for history in itr.channel.history(limit=20):
+    try:
+        caller = interaction.user
+
+        messages: list[Message] = []
+        async for history in interaction.channel.history(limit=20):
             content = history.content
 
             # 遇到周次分隔線，停止動作
@@ -149,7 +171,7 @@ async def do_command(itr: Interaction):
                 break
 
             # 非機器人發送的訊息，不處理
-            if history.author.id != bot_client_id():
+            if history.author.id != bot.client_id():
                 continue
 
             # 非本人的報刀訊息，不處理
@@ -164,18 +186,18 @@ async def do_command(itr: Interaction):
 
         # 沒有任何報刀紀錄
         if len(messages) == 0:
-            await reply_error(itr, f"本週次您尚未有透過機器人進行報刀的紀錄。")
+            await reply_error(interaction, f"本週次您尚未有透過機器人進行報刀的紀錄。")
             return
 
         # 因為訊息是由舊到新，所以要反轉
         messages.reverse()
 
         # send message with buttons
-        await itr.response.send_message(
+        await interaction.response.send_message(
             ephemeral=True,
             view=RmView(caller, messages),
         )
     except Exception as ex:
         print(ex)
-        await itr.response.send_message(content="發生錯誤", ephemeral=True)
+        await interaction.response.send_message(content="發生錯誤", ephemeral=True)
         pass

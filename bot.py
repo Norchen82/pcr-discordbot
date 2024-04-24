@@ -1,3 +1,7 @@
+import module.cfg as cfg
+
+cfg.init()
+
 import os
 import discord
 from discord.ui import Button
@@ -5,48 +9,40 @@ from discord import app_commands
 import module.cal as cal
 import module.msg as msg
 import module.broadcast as broadcast
-import module.env as env
+
 import module.perm as perm
 import module.atkcheckin as atkcheckin
+import module.bot as bot
 import re
 from datetime import datetime, timedelta
 import pytz
 import urllib.parse
-
 import commands.rm as rm
+from module.bot import client
 
-bot_token = os.getenv("BOT_TOKEN")
-guild_id = os.getenv("GUILD_ID")
-
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-
-client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
-
-guild = client.get_guild(int(guild_id))
-role_choices: list = []
+role_choices: list[app_commands.Choice[str]] = []
 
 
 def init_role_choices():
     global role_choices
-    for role in env.get_roles():
-        role_choices.append(app_commands.Choice(name=role.name, value=role.id))
+    for clan in cfg.clans():
+        role_choices.append(
+            app_commands.Choice(name=clan.role_name, value=str(clan.role_id))
+        )
 
 
 class History:
-    def __init__(self, member_id: int, histories: list):
+    def __init__(self, member_id: int, histories: list[int]):
         self.member_id = member_id
         self.histories = histories
 
 
 @client.event
 async def on_ready():
-    env.init(client)
     init_role_choices()
 
-    await tree.sync(guild=discord.Object(id=guild_id))
+    await tree.sync(guild=discord.Object(id=cfg.guild_id()))
     print(f"Logged on as {client.user}")
 
 
@@ -61,7 +57,11 @@ async def on_message(message: discord.Message):
             return
 
         # 如果非報刀區的頻道，就不處理
-        if env.get_boss_health(message.channel.id) == None:
+        if cfg.boss_health(message.channel.id) == None:
+            return
+
+        # 如果非文字頻道，就不處理
+        if not isinstance(message.channel, discord.TextChannel):
             return
 
         # 將訊息以行為單位進行處理
@@ -87,7 +87,7 @@ async def on_message(message: discord.Message):
 @tree.command(
     name="cal",
     description="簡易計算機，支援四則運算",
-    guild=discord.Object(id=guild_id),
+    guild=discord.Object(id=cfg.guild_id()),
 )
 @app_commands.describe(
     expr="請輸入數學算式，不要包含等號。例如:24000-4800",
@@ -112,7 +112,7 @@ async def command_cal(ctx: discord.Interaction, expr: str, desc: str = ""):
 @tree.command(
     name="go",
     description="【已棄用】請直接在報刀區輸入預估傷害。",
-    guild=discord.Object(id=guild_id),
+    guild=discord.Object(id=cfg.guild_id()),
 )
 @app_commands.describe(
     value="請輸入你本次出刀預估的傷害量。",
@@ -139,26 +139,26 @@ async def command_go(ctx: discord.Interaction, value: str, desc: str = ""):
             ephemeral=True,
             delete_after=5,
         )
-    except Exception as ex:
+    except Exception:
         await msg.reply_error(ctx, "預估傷害不正確。")
 
 
 @tree.command(
     name="rm",
     description="【報刀用指令】刪除你本週次出的最後一個刀。",
-    guild=discord.Object(id=guild_id),
+    guild=discord.Object(id=cfg.guild_id()),
 )
 async def command_rm(itr: discord.Interaction):
     try:
         await rm.do_command(itr)
-    except Exception as ex:
+    except Exception:
         await itr.response.edit_message(content="發生錯誤", view=None, delete_after=5)
 
 
 @tree.command(
     name="history",
     description="查看指定日期各戰隊成員在報刀區的總留言數。（警告：此功能測試中，不保證運作正確）",
-    guild=discord.Object(id=guild_id),
+    guild=discord.Object(id=cfg.guild_id()),
 )
 @app_commands.describe(role="要查詢的戰隊", datestr="要查詢的日期，格式:yyyy-mm-dd")
 @app_commands.rename(role="戰隊", datestr="日期")
@@ -167,6 +167,14 @@ async def command_history(
     ctx: discord.Interaction, role: app_commands.Choice[str], datestr: str
 ):
     try:
+        if ctx.guild is None:
+            raise Exception("The guild is not found.")
+
+        # 檢查伺服器管理員ID是否正確
+        master_id = cfg.master_id()
+        if master_id == None:
+            raise Exception("The master ID is not found.")
+
         timezone_tw = pytz.timezone("ROC")
         date = datetime.strptime(datestr, "%Y-%m-%d").replace(tzinfo=timezone_tw)
 
@@ -176,25 +184,38 @@ async def command_history(
 
         # Initialize member map
         drole = ctx.guild.get_role(int(role.value))
+        if drole is None:
+            raise Exception("The role is not found.")
 
-        histories = {}
+        histories: dict[int, list[int]] = {}
         for member in drole.members:
             histories[member.id] = [0, 0, 0, 0, 0]
 
-        histories[env.get_master_id()] = [0, 0, 0, 0, 0]
+        histories[master_id] = [0, 0, 0, 0, 0]
 
+        # FIXME: 應改為直接loop戰隊資料
         for index in range(1, 6):
-            channel_ids = os.getenv(f"BOSS{index}_CHANNEL").split(",")
-            role_index = role_ids.index(role.value)
+            channel_ids = str(os.getenv(f"BOSS{index}_CHANNEL")).split(",")
+            clans = cfg.clans()
+            role_index = next(
+                (i for i, clan in enumerate(clans) if clan.role_id == int(role.value)),
+                None,
+            )
+
+            if role_index == None:
+                raise Exception("The role is not found.")
 
             channel = ctx.guild.get_channel(int(channel_ids[role_index]))
+            if not isinstance(channel, discord.TextChannel):
+                raise Exception("The channel is not found.")
+
             h = [
                 history
                 async for history in channel.history(after=begin_time, before=end_time)
             ]
             for history in h:
                 member_id = history.author.id
-                if member_id == client.user.id:
+                if member_id == bot.client_id():
                     matches = re.findall(r"<@\d+>", history.content)
                     match = str(matches[0])
 
@@ -202,7 +223,7 @@ async def command_history(
 
                 histories[member_id][index - 1] += 1
 
-        hl = []
+        hl: list[History] = []
         for key in histories:
             hl.append(History(member_id=key, histories=histories[key]))
         hl = sorted(hl, key=lambda x: sum(x.histories), reverse=True)
@@ -211,6 +232,8 @@ async def command_history(
         body = ""
         for h in hl:
             member = ctx.guild.get_member(h.member_id)
+            if member is None:
+                raise Exception("The member is not found.")
 
             total = 0
             body += f"**{member.display_name}** : "
@@ -232,7 +255,7 @@ async def command_history(
 @tree.command(
     name="broadcast_add",
     description="綁定廣播頻道（此指令只有管理員可以使用）",
-    guild=discord.Object(id=guild_id),
+    guild=discord.Object(id=cfg.guild_id()),
 )
 @app_commands.describe(channel="要被廣播訊息的頻道")
 @app_commands.rename(channel="頻道")
@@ -256,7 +279,7 @@ async def command_broadcast_add(ctx: discord.Interaction, channel: discord.TextC
 @tree.command(
     name="broadcast_rm",
     description="移除廣播頻道（此指令只有管理員可以使用）",
-    guild=discord.Object(id=guild_id),
+    guild=discord.Object(id=cfg.guild_id()),
 )
 @app_commands.describe(channel="要被從清單中移除的頻道")
 @app_commands.rename(channel="頻道")
@@ -280,7 +303,7 @@ async def command_broadcast_rm(ctx: discord.Interaction, channel: discord.TextCh
 @tree.command(
     name="broadcast_list",
     description="列出廣播頻道清單（此指令只有管理員可以使用）",
-    guild=discord.Object(id=guild_id),
+    guild=discord.Object(id=cfg.guild_id()),
 )
 async def command_broadcast_list(ctx: discord.Interaction):
     try:
@@ -294,9 +317,14 @@ async def command_broadcast_list(ctx: discord.Interaction):
 
         targets = broadcast.get_broadcast_targets()
         for target in targets:
-            channel = client.get_guild(target["guildId"]).get_channel(
-                target["channelId"]
-            )
+            guild = client.get_guild(target.guild_id)
+            if guild is None:
+                continue
+
+            channel = guild.get_channel(target.channel_id)
+            if channel is None:
+                continue
+
             channel_names += channel.name + "\n"
 
         if channel_names == "":
@@ -315,7 +343,7 @@ async def command_broadcast_list(ctx: discord.Interaction):
 @tree.command(
     name="broadcast",
     description="向綁定的頻道廣播訊息（此指令只有管理員可以使用）",
-    guild=discord.Object(id=guild_id),
+    guild=discord.Object(id=cfg.guild_id()),
 )
 @app_commands.describe(message="廣播的訊息內容")
 @app_commands.rename(message="訊息內容")
@@ -337,27 +365,32 @@ async def command_broadcast(ctx: discord.Interaction, message: str):
 
         view = discord.ui.View()
 
-        confirm_button = Button(
+        confirm_button = Button[discord.ui.View](
             style=discord.ButtonStyle.green,
             label="確認",
             custom_id="confirm",
         )
-        confirm_button.callback = lambda i: confirm_broadcast(ctx, message)
+        confirm_button.callback = lambda interaction: confirm_broadcast(ctx, message)
         view.add_item(confirm_button)
 
-        cancel_button = Button(
+        cancel_button = Button[discord.ui.View](
             style=discord.ButtonStyle.red,
             label="取消",
             custom_id="cancel",
         )
-        cancel_button.callback = lambda i: cancel_broadcast(ctx)
+        cancel_button.callback = lambda interaction: cancel_broadcast(ctx)
         view.add_item(cancel_button)
 
         channel_names = ""
         for target in targets:
-            channel = client.get_guild(target["guildId"]).get_channel(
-                target["channelId"]
-            )
+            guild = client.get_guild(target.guild_id)
+            if guild is None:
+                continue
+
+            channel = guild.get_channel(target.channel_id)
+            if channel is None:
+                continue
+
             channel_names += channel.name + "\n"
 
         await ctx.response.send_message(
@@ -383,23 +416,24 @@ async def cancel_broadcast(ctx: discord.Interaction):
 @tree.command(
     name="img",
     description="根據傳入的時間軸，產生隊伍角色的圖片。",
-    guild=discord.Object(id=guild_id),
+    guild=discord.Object(id=cfg.guild_id()),
 )
 async def command_img(ctx: discord.Interaction):
     await ctx.response.send_modal(GenPicModal())
 
 
 class GenPicModal(discord.ui.Modal, title="產生隊伍角色圖片"):
-    timeline = discord.ui.TextInput(
-        label="時間軸",
-        placeholder="請輸入時間軸",
-        required=True,
-        style=discord.TextStyle.paragraph,
-    )
+    def __init__(self):
+        self.timeline = discord.ui.TextInput[GenPicModal](
+            label="時間軸",
+            placeholder="請輸入時間軸",
+            required=True,
+            style=discord.TextStyle.paragraph,
+        )
 
     async def on_submit(self, interaction: discord.Interaction):
         tl = urllib.parse.quote(self.timeline.value)
-        url = f"[隊伍圖片連結]({env.get_website_url()}?tl={tl})"
+        url = f"[隊伍圖片連結]({cfg.website_url()}?tl={tl})"
         await interaction.response.send_message(url, ephemeral=True)
 
     async def on_error(
@@ -412,4 +446,5 @@ class GenPicModal(discord.ui.Modal, title="產生隊伍角色圖片"):
         print(error)
 
 
-client.run(bot_token)
+if __name__ == "__main__":
+    client.run(cfg.bot_token())

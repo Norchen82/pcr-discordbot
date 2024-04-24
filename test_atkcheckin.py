@@ -1,8 +1,14 @@
 import asyncio
 import unittest
+from unittest.mock import MagicMock, patch
 import module.atkcheckin as atkcheckin
+import module.msg as msg
+import module.cfg as cfg
 from module.msg import MessageWriter, MessageReader, TextMessage
 from random import random
+
+if __name__ == "__main__":
+    cfg.init()
 
 
 class FakeMessageReader(MessageReader):
@@ -21,11 +27,19 @@ class FakeMessageWriter(MessageWriter):
     def __init__(self, channel_id: int, reader: FakeMessageReader):
         self.reader = reader
         self.channel_id = channel_id
-        self.messages = []
+        self.messages: list[str] = []
 
-    async def write(self, content: str, mention: int = None, silent: bool = False):
+    async def write(
+        self, content: str, mention: int | None = None, silent: bool = False
+    ) -> msg.TextMessage:
+        if mention is None:
+            mention = 0
+
+        message = TextMessage(content, int(random()), mention, self.channel_id)
+
         self.messages.append(f"<@{mention}> {content}")
-        self.reader.push(TextMessage(content, random(), mention, self.channel_id))
+        self.reader.push(message)
+        return message
 
     async def delete(self):
         pass
@@ -97,7 +111,7 @@ MULTIPLE_HISTORIES = [
 
 
 def message_from_bot(content: str) -> TextMessage:
-    return TextMessage(content, random(), BOT_ID, CHANNEL_ID)
+    return TextMessage(content, int(random()), BOT_ID, CHANNEL_ID)
 
 
 def message_from_caller(content: str) -> TextMessage:
@@ -115,10 +129,13 @@ def command_option(command_lines: list[str]) -> atkcheckin.AttackCheckinOption:
 
 class DoCommandTest(unittest.TestCase):
 
-    def test_single_history(self):
+    @patch("module.cfg.boss_health")
+    def test_single_history(self, mock_boss_health: MagicMock):
         """
         測試報刀歷史紀錄僅有一筆的狀況
         """
+        mock_boss_health.return_value = 30000
+
         option = command_option(command_lines=["-5000"])
         reader = FakeMessageReader(
             messages=[
@@ -131,10 +148,13 @@ class DoCommandTest(unittest.TestCase):
         asyncio.run(atkcheckin.do_command(option, reader, writer))
         self.assertEqual(writer.messages, [f"<@{CALLER_ID}> 30000-5000=25000"])
 
-    def test_multiple_histories(self):
+    @patch("module.cfg.boss_health")
+    def test_multiple_histories(self, mock_boss_health: MagicMock):
         """
         測試報刀歷史紀錄有多筆的狀況
         """
+        mock_boss_health.return_value = 30000
+
         option = command_option(command_lines=["-3500"])
         reader = FakeMessageReader(
             messages=[
@@ -147,10 +167,13 @@ class DoCommandTest(unittest.TestCase):
         asyncio.run(atkcheckin.do_command(option, reader, writer))
         self.assertEqual(writer.messages, [f"<@{CALLER_ID}> 15800-3500=12300"])
 
-    def test_multiple_damage(self):
+    @patch("module.cfg.boss_health")
+    def test_multiple_damage(self, mock_boss_health: MagicMock):
         """
         測試報刀指令中有多個預估傷害的狀況
         """
+        mock_boss_health.return_value = 30000
+
         option = command_option(command_lines=["-3500-7000-5000-3400"])
         reader = FakeMessageReader(
             messages=[
@@ -165,10 +188,13 @@ class DoCommandTest(unittest.TestCase):
             writer.messages, [f"<@{CALLER_ID}> 15800-3500-7000-5000-3400=-3100"]
         )
 
-    def test_multiple_lines_command(self):
+    @patch("module.cfg.boss_health")
+    def test_multiple_lines_command(self, mock_boss_health: MagicMock):
         """
         測試報刀指令有多行的狀況
         """
+        mock_boss_health.return_value = 30000
+
         option = command_option(
             command_lines=[
                 "-2150",
@@ -196,10 +222,12 @@ class DoCommandTest(unittest.TestCase):
             ],
         )
 
-    def test_damage_trailing_desc(self):
+    @patch("module.cfg.boss_health")
+    def test_damage_trailing_desc(self, mock_boss_health: MagicMock):
         """
         測試預估傷害後面有其他文字描述的狀況
         """
+        mock_boss_health.return_value = 30000
         option = command_option(
             command_lines=[
                 "-2150這是訊息",
@@ -227,10 +255,13 @@ class DoCommandTest(unittest.TestCase):
             ],
         )
 
-    def test_damage_with_desc(self):
+    @patch("module.cfg.boss_health")
+    def test_damage_with_desc(self, mock_boss_health: MagicMock):
         """
         測試報刀指令中的預估傷害存在描述的狀況
         """
+        mock_boss_health.return_value = 30000
+
         option = command_option(
             command_lines=[
                 "-補償2150",
@@ -258,10 +289,13 @@ class DoCommandTest(unittest.TestCase):
             ],
         )
 
-    def test_multiply(self):
+    @patch("module.cfg.boss_health")
+    def test_multiply(self, mock_boss_health: MagicMock):
         """
         測試報刀指令中有乘法的狀況
         """
+        mock_boss_health.return_value = 30000
+
         option = command_option(
             command_lines=[
                 "-1000x2",

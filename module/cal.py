@@ -3,6 +3,7 @@ This module contains functions for performing mathematical operations.
 """
 
 import re
+from typing import Callable
 
 # The definitions of mathematical symbol
 PLUS = "+"
@@ -14,12 +15,12 @@ def is_mult(op: str):
     return op == "*" or op == "X" or op == "x"
 
 
-def compile(string):
+def compile(string: str) -> int:
     """Calculate the expression and return the result."""
     return expr(string)
 
 
-def expr(string):
+def expr(string: str) -> int:
     """
     Perform expression calculation:
     `<expr> ::= <term> { [+,-] <term> }`.
@@ -44,7 +45,7 @@ def expr(string):
     return result
 
 
-def expr_operation(operator):
+def expr_operation(operator: str) -> Callable[[int, int], int]:
     """Get the valid expression operation base on the given operator."""
     if operator == PLUS:
         return add
@@ -54,7 +55,7 @@ def expr_operation(operator):
         raise Exception(f"expr: Unknown operator '{operator}'")
 
 
-def term(string):
+def term(string: str) -> int:
     """
     Perform term calculation:
     `<term> ::= <factor> { [*,/] <factor> }`.
@@ -79,7 +80,7 @@ def term(string):
     return result
 
 
-def term_operation(operator):
+def term_operation(operator: str) -> Callable[[int, int], int]:
     """Get the valid term operation base on the given operator."""
     if is_mult(operator):
         return mutiply
@@ -89,7 +90,7 @@ def term_operation(operator):
         raise Exception(f"term: Unknown operator '{operator}'")
 
 
-def factor(string):
+def factor(string: str) -> int:
     """
     Perform factor calculation:
     `<factor> ::= '(' <expr> ')' | <constant>`
@@ -102,7 +103,7 @@ def factor(string):
         return constant(string)
 
 
-def constant(string):
+def constant(string: str) -> int:
     """
     Perform constant calculation:
     `<constant> ::= <natural number>
@@ -110,21 +111,21 @@ def constant(string):
     return int(string.strip())
 
 
-def add(x, y):
+def add(x: int, y: int) -> int:
     """Perform the calculation of `x + y`."""
     return x + y
 
 
-def subtract(x, y):
+def subtract(x: int, y: int) -> int:
     """Perform the calculation of `x - y`."""
     return x - y
 
 
-def mutiply(x, y):
+def mutiply(x: int, y: int) -> int:
     """Perform the calculation of `x * y`."""
     return x * y
 
 
-def divide(x, y):
+def divide(x: int, y: int) -> int:
     """Perform the calculation of `x / y`."""
-    return x / y
+    return int(x / y)

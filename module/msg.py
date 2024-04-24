@@ -4,8 +4,6 @@ This module contains functions to interact with Discord message system.
 
 import re
 import discord
-from discord import Member, User, Message
-from typing import AsyncIterator
 import pytz
 
 # The time for the error message to live
@@ -21,14 +19,16 @@ class TextMessage:
 
 
 class MessageWriter:
-    async def write(self, content: str, mention: int = None, slient: bool = False):
-        pass
+    async def write(
+        self, content: str, mention: int | None = None, silent: bool = False
+    ) -> TextMessage:
+        raise NotImplementedError
 
-    async def delete(self):
-        pass
+    async def delete(self) -> None:
+        raise NotImplementedError
 
-    async def delete_by_id(self, id: int):
-        pass
+    async def delete_by_id(self, id: int) -> None:
+        raise NotImplementedError
 
 
 class DiscordMessageWriter(MessageWriter):
@@ -36,7 +36,7 @@ class DiscordMessageWriter(MessageWriter):
         self.message = message
 
     async def write(
-        self, content: str, mention: int = None, silent: bool = False
+        self, content: str, mention: int | None = None, silent: bool = False
     ) -> TextMessage:
         if mention != None:
             content = f"<@{mention}> {content}"
@@ -50,6 +50,9 @@ class DiscordMessageWriter(MessageWriter):
         )
 
     async def delete(self):
+        if type(self.message.channel) != discord.TextChannel:
+            return
+
         channel_name = self.message.channel.name
         author_name = self.message.author.display_name
         content = self.message.content
@@ -69,7 +72,7 @@ class DiscordTextChannelWriter(MessageWriter):
         self.channel = channel
 
     async def write(
-        self, content: str, mention: int = None, silent: bool = False
+        self, content: str, mention: int | None = None, silent: bool = False
     ) -> TextMessage:
         if mention != None:
             content = f"<@{mention}> {content}"
@@ -82,17 +85,17 @@ class DiscordTextChannelWriter(MessageWriter):
             channel_id=new_message.channel.id,
         )
 
-    async def delete(self):
+    async def delete(self) -> None:
         pass
 
-    async def delete_by_id(self, id: int):
+    async def delete_by_id(self, id: int) -> None:
         message = await self.channel.fetch_message(id)
         await message.delete()
 
 
 class MessageReader:
     async def read_all(self, limit: int) -> list[TextMessage]:
-        pass
+        raise NotImplementedError
 
 
 class DiscordTextChannelReader(MessageReader):
@@ -116,6 +119,9 @@ async def reply_with_message(ctx: discord.Interaction, content: str):
     Reply to the user's command with a standard message.
     This is intended to make the channel look cleaner because the orignial interaction message includes extra information such as "<who> used <command>"
     """
+    if type(ctx.channel) != discord.TextChannel:
+        raise Exception("此指令只允許在文字頻道中執行。")
+
     mention_user = mention(ctx.user)
     message = f"{mention_user} {content}"
 
@@ -140,14 +146,16 @@ async def reply_error(ctx: discord.Interaction, error_message: str):
     )
 
 
-def mention(user: User | Member):
+def mention(user: discord.User | discord.Member):
     """
     Get the syntax for mentioning the specified user.
     """
     return f"<@{user.id}>"
 
 
-async def get_round_lines(reader: MessageReader, ignores: list[Message]) -> list[str]:
+async def get_round_lines(
+    reader: MessageReader, ignores: list[str] = []
+) -> list[str] | None:
     """
     取得本周次的所有報刀訊息行。
     """
@@ -161,9 +169,7 @@ async def get_round_lines(reader: MessageReader, ignores: list[Message]) -> list
         lines.reverse()
         for index, line in enumerate(lines):
             true_index = len(lines) - index - 1
-            if ignores != None and True in [
-                f"{message.id}_{true_index}" == ignore for ignore in ignores
-            ]:
+            if True in [f"{message.id}_{true_index}" == ignore for ignore in ignores]:
                 continue
 
             line = line.strip()
@@ -189,6 +195,9 @@ async def get_round_lines(reader: MessageReader, ignores: list[Message]) -> list
 
 
 async def last_message(ctx: discord.Interaction):
+    if type(ctx.channel) != discord.TextChannel:
+        raise Exception("此指令只允許在文字頻道中執行。")
+
     if ctx.channel.last_message != None:
         return ctx.channel.last_message
 

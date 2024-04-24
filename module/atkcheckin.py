@@ -1,7 +1,7 @@
 import asyncio
 import re
 import module.msg as msg
-import module.env as env
+import module.cfg as cfg
 import module.cal as cal
 from typing import List
 
@@ -12,7 +12,7 @@ DAMAGE_PATTERN_FOR_SPLIT = (
 )
 PURE_DAMAGE_PATTERN = r"[^xX\*\-\d]"
 
-checkin_queue = {}
+checkin_queue: dict[int, list[str]] = {}
 
 
 def parse_remaining_health(lines: List[str], max_health: int):
@@ -84,7 +84,7 @@ def pop_checkin_queue(group_id: int):
     checkin_queue[group_id].pop(0)
 
 
-def get_checkin_queue(group_id: int):
+def get_checkin_queue(group_id: int) -> list[str]:
     """
     取得報刀佇列。
     """
@@ -156,7 +156,7 @@ async def do_command(
     boss_id = option.boss_id
 
     # 已發送的非報刀的訊息
-    not_attack_messages = []
+    not_attack_messages: list[msg.TextMessage] = []
 
     for index, line in enumerate(command_lines):
         # 如果非報刀訊息，就不處理
@@ -173,6 +173,7 @@ async def do_command(
             continue
 
         # 先將此報刀訊息加入報刀佇列
+        queue_key = ""
         if not option.reverse:
             queue_key = f"{command_id}_{index}"
             push_checkin_queue(boss_id, queue_key)
@@ -203,7 +204,10 @@ async def do_command(
             if option.reverse:
                 estimated_damage = re.sub(r"\-", "+", estimated_damage)
 
-            max_health = env.get_boss_health(boss_id)
+            max_health = cfg.boss_health(boss_id)
+            if max_health == None:
+                raise Exception("Boss not found.")
+
             lines = await msg.get_round_lines(reader, get_checkin_queue(boss_id))
             if lines == None:
                 raise Exception("No round lines found.")
