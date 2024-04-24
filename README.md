@@ -34,6 +34,9 @@ Bikara是手機遊戲《超異域公主連結☆Re：Dive》的Discord專用報�
 | TEXT PERMISSIONS | Read Message History |
 | TEXT PERMISSIONS | Mention Everyone |
 
+4. 確認你有一個可用的MongoDB環境。不想在自己的電腦安裝MongoDB的話，[MongoDB官方](https://www.mongodb.com/atlas/database)有免費的環境可以使用，只要辦帳號就好了。  
+（如果沒有MongoDB環境可用的話，`broadcast`相關指令會不能使用，如果用不到也可以跳過此步驟。）
+
 ### 執行檔
 
 #### Windows
@@ -59,10 +62,10 @@ Bikara是手機遊戲《超異域公主連結☆Re：Dive》的Discord專用報�
                     "id": 0,
                     "health": 0
                 },
-                ...
+                // ...
             ]
         },
-        ...
+        // ...
     ],
     "mongo": {
         "protocol": "",
