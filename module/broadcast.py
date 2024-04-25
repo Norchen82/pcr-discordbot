@@ -15,11 +15,13 @@ if protocol == "mongodb+srv":
     connection_str = f"mongodb+srv://{user_name}:{password}@{host}"
 elif protocol == "mongodb":
     connection_str = f"mongodb://{user_name}:{password}@{host}:{port}"
-else:
-    raise ValueError("Invalid protocol of MongoDB connection.")
 
-client = pymongo.MongoClient(connection_str)
-db = client.bot
+client: pymongo.MongoClient | None = None
+db: pymongo.database.Database | None = None
+
+if connection_str != "":
+    client = pymongo.MongoClient(connection_str)
+    db = client.bot
 
 
 class BroadcastTarget:
@@ -33,6 +35,9 @@ def add_channel(guild_id: int, channel_id: int):
     """
     將指定的頻道加入廣播對象列表內
     """
+    if db is None:
+        raise Exception("Connection to database failed.")
+
     targets = [
         target
         for target in db.broadcastTargets.find(
@@ -51,6 +56,9 @@ def delete_channel(guild_id: int, channel_id: int):
     """
     將指定的頻道從廣播對象列表中移除
     """
+    if db is None:
+        raise Exception("Connection to database failed.")
+
     db.broadcastTargets.delete_one(
         {"targetType": "textChannel", "guildId": guild_id, "channelId": channel_id}
     )
@@ -60,6 +68,9 @@ def get_broadcast_targets() -> list[BroadcastTarget]:
     """
     取得廣播對象列表
     """
+    if db is None:
+        raise Exception("Connection to database failed.")
+
     return [
         BroadcastTarget(
             target_type=target["targetType"],
