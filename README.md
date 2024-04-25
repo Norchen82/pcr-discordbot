@@ -39,12 +39,10 @@ Bikara是手機遊戲《超異域公主連結☆Re：Dive》的Discord專用報�
 
 ### 執行檔
 
-#### Windows
-1. 下載`bikara.exe`執行檔。
+#### Linux
+1. 根據你的處理器架構下載`bikara-linux-amd64`或`bikara-linux-arm64`。
 2. 在同一個目錄下建立`config.json`檔案。
-3. 執行`bikara.exe`。
-
-（註：防毒軟體可能會將`bikara.exe`視為病毒，有疑慮的話可以自行clone原始碼建置或執行，或不使用）
+3. 執行下載下來的bikara執行檔。
 
 #### config.json
 
@@ -62,10 +60,8 @@ Bikara是手機遊戲《超異域公主連結☆Re：Dive》的Discord專用報�
                     "id": 0,
                     "health": 0
                 },
-                // ...
             ]
         },
-        // ...
     ],
     "mongo": {
         "protocol": "",
@@ -101,4 +97,4 @@ Bikara是手機遊戲《超異域公主連結☆Re：Dive》的Discord專用報�
 | --- |
 | [discord.py](https://pypi.org/project/discord.py/) |
 | [pytz](https://pypi.org/project/pytz/) |
-| [pymongo](https://pypi.org/project/pymongo/)
+| [pymongo](https://pypi.org/project/pymongo/) |
