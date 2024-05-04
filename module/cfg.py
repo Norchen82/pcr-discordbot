@@ -1,7 +1,6 @@
 # Bind the health to the boss channel
 import json
 import os
-import urllib.parse
 
 
 class ChannelConfig:
@@ -219,7 +218,7 @@ class EnvironmentVariableLoader:
 
         env_value = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
         if env_value != None and env_value != "":
-            self.__env.mongo.password = urllib.parse.quote_plus(env_value)
+            self.__env.mongo.password = env_value
 
         env_value = os.getenv("MONGO_HOST")
         if env_value != None and env_value != "":

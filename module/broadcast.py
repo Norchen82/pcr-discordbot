@@ -3,6 +3,7 @@ import pymongo
 import discord
 
 import module.cfg as cfg
+import urllib.parse
 
 protocol = cfg.mongo_protocol()
 host = cfg.mongo_host()
@@ -14,7 +15,9 @@ connection_str = ""
 if protocol == "mongodb+srv":
     connection_str = f"mongodb+srv://{user_name}:{password}@{host}"
 elif protocol == "mongodb":
-    connection_str = f"mongodb://{user_name}:{password}@{host}:{port}"
+    connection_str = (
+        f"mongodb://{user_name}:{urllib.parse.quote_plus(password)}@{host}:{port}"
+    )
 
 client: pymongo.MongoClient | None = None
 db: pymongo.database.Database | None = None
@@ -85,9 +88,7 @@ async def broadcast(client: discord.Client, message: str):
     targets = get_broadcast_targets()
     for target in targets:
         try:
-            channel = client.get_guild(target["guildId"]).get_channel(
-                target["channelId"]
-            )
+            channel = client.get_guild(target.guild_id).get_channel(target.channel_id)
             await channel.send(content=message)
         except:
             pass

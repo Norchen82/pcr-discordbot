@@ -21,7 +21,9 @@ from module.atkcheckin import (
     AttackCheckinOption,
     sub_estimated_damage,
 )
-import module.bot as bot
+
+from module import bot
+import bot
 
 rm_queue: list[int] = []
 
