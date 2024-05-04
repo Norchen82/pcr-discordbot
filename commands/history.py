@@ -3,7 +3,6 @@ import discord
 from discord import app_commands
 import pytz
 from module import cfg, bot
-import os
 import re
 import bot
 
@@ -44,20 +43,16 @@ async def do_command(
 
         histories[master_id] = [0, 0, 0, 0, 0]
 
-        # FIXME: 應改為直接loop戰隊資料
-        for index in range(1, 6):
-            channel_ids = str(os.getenv(f"BOSS{index}_CHANNEL")).split(",")
-            clans = cfg.clans()
-            role_index = next(
-                (i for i, clan in enumerate(clans) if clan.role_id == int(role.value)),
-                None,
-            )
+        # 根據身分組ID取得對應的戰隊資料
+        clan = cfg.clan(int(role.value))
+        if clan is None:
+            raise Exception("The role is not found.")
 
-            if role_index == None:
-                raise Exception("The role is not found.")
-
-            channel = ctx.guild.get_channel(int(channel_ids[role_index]))
-            if not isinstance(channel, discord.TextChannel):
+        # 讀取該戰隊所有出刀頻道的對話紀錄
+        # 並計算每位成員的出刀次數
+        for index, channel_config in enumerate(clan.boss_channels):
+            channel = ctx.guild.get_channel(channel_config.id)
+            if channel is None or not isinstance(channel, discord.TextChannel):
                 raise Exception("The channel is not found.")
 
             h = [
@@ -70,9 +65,17 @@ async def do_command(
                     matches = re.findall(r"<@\d+>", history.content)
                     match = str(matches[0])
 
+                    # 若非以mention開頭，則不處理
+                    if not history.content.startswith(match):
+                        continue
+
+                    # 字串中含有「取消報刀」的訊息，不處理
+                    if "取消報刀" in history.content:
+                        continue
+
                     member_id = int(match[2:-1])
 
-                histories[member_id][index - 1] += 1
+                histories[member_id][index] += 1
 
         hl: list[History] = []
         for key in histories:

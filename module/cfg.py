@@ -285,6 +285,17 @@ def dev_id() -> int | None:
     return config.dev_id
 
 
+def clan(role_id: int) -> ClanConfig | None:
+    """
+    取得指定的戰隊設定
+    """
+    for clan in config.clans:
+        if clan.role_id == role_id:
+            return clan
+
+    return None
+
+
 def clans() -> list[ClanConfig]:
     """
     取得Discord頻道中與戰隊戰相關的身分組清單
