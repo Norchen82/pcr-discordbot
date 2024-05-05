@@ -300,7 +300,8 @@ def clans() -> list[ClanConfig]:
     """
     取得Discord頻道中與戰隊戰相關的身分組清單
     """
-    return config.clans
+    # 回傳除了測試用的戰隊外的所有戰隊
+    return [clan for clan in config.clans if clan.role_name != "test"]
 
 
 def boss_health(boss_id: int) -> int | None:
