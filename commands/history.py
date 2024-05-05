@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import traceback
 import discord
 from discord import app_commands
 import pytz
@@ -63,6 +64,9 @@ async def do_command(
                 member_id = history.author.id
                 if member_id == bot.client_id():
                     matches = re.findall(r"<@\d+>", history.content)
+                    if len(matches) == 0:
+                        continue
+
                     match = str(matches[0])
 
                     # 若非以mention開頭，則不處理
@@ -74,6 +78,9 @@ async def do_command(
                         continue
 
                     member_id = int(match[2:-1])
+
+                if member_id not in histories:
+                    continue
 
                 histories[member_id][index] += 1
 
@@ -101,6 +108,7 @@ async def do_command(
         await ctx.response.send_message(embed=embed)
     except Exception as ex:
         print(ex, flush=True)
+        traceback.print_exc()
         await ctx.response.send_message(
             content="輸入錯誤，請檢查日期格式是否正確", ephemeral=True, delete_after=3
         )
