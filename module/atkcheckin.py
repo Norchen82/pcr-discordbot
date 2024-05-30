@@ -40,7 +40,7 @@ def get_remaining_health(line: str, current_health: int) -> int:
             return current_health
 
         # 如果中間有貼圖，就先把貼圖移除
-        line = re.sub(r"<:.+:\d+>", "", line)
+        line = re.sub(r"<.+:.+:\d+>", "", line)
 
         # 抓等號後的數字做為剩餘血量
         damage = re.findall(r"\=\d+", line)
