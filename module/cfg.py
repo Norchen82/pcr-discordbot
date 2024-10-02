@@ -2,6 +2,8 @@
 import json
 import os
 
+root_dir: str = ""
+
 
 class ChannelConfig:
     def __init__(self, id: int, health: int):
@@ -46,6 +48,36 @@ class Role:
         return self.name
 
 
+class ClanBattleNotificationConfigClan:
+    def __init__(
+        self,
+        leader_viewer_id: int,
+        guild_id: int,
+        channel_id: int | None = None,
+        thread_id: int | None = None,
+        cron: str | None = None,
+        polling_channel_id: int | None = None,
+        polling_channel_name: str | None = None,
+        update_on_start: bool = False,
+    ):
+        self.leader_viewer_id = leader_viewer_id
+        self.guild_id = guild_id
+        self.channel_id = channel_id
+        self.thread_id = thread_id
+        self.cron = cron
+        self.polling_channel_id = polling_channel_id
+        self.polling_channel_name = polling_channel_name
+        self.update_on_start = update_on_start
+
+
+class ClanBattleNotificationConfig:
+    def __init__(
+        self,
+        clans: list[ClanBattleNotificationConfigClan] = [],
+    ):
+        self.clans = clans
+
+
 class BotConfiguration:
     def __init__(
         self,
@@ -56,6 +88,8 @@ class BotConfiguration:
         clans: list[ClanConfig] = [],
         website_url: str | None = None,
         mongo: MongoDbConfig | None = None,
+        clan_battle_notification: ClanBattleNotificationConfig | None = None,
+        bot_clan_id: int | None = None,
     ):
         self.bot_token = bot_token
         self.guild_id = guild_id
@@ -64,6 +98,8 @@ class BotConfiguration:
         self.clans: list[ClanConfig] = clans
         self.website_url = website_url
         self.mongo = mongo
+        self.clan_battle_notification = clan_battle_notification
+        self.bot_clan_id = bot_clan_id
 
 
 class JsonConfigLoader:
@@ -149,6 +185,64 @@ class JsonConfigLoader:
 
                 self.__env.mongo = mongo
 
+            if "clanBattleNotification" in data:
+                if "clans" in data["clanBattleNotification"]:
+                    clans: list[ClanBattleNotificationConfigClan] = []
+                    for clan in data["clanBattleNotification"]["clans"]:
+                        if "leaderViewerId" not in clan:
+                            raise ValueError(
+                                "The 'leaderViewerId' field is required in 'clanBattleNotification.clans'."
+                            )
+
+                        leader_viewer_id = clan["leaderViewerId"]
+                        if "guildId" not in clan:
+                            raise ValueError(
+                                "The 'guildId' field is required in 'clanBattleNotification.clans'."
+                            )
+
+                        guild_id = clan["guildId"]
+
+                        channel_id = (
+                            int(clan["channelId"]) if "channelId" in clan else None
+                        )
+                        thread_id = (
+                            int(clan["threadId"]) if "threadId" in clan else None
+                        )
+                        cron = clan["cron"] if "cron" in clan else None
+                        polling_channel_id = (
+                            int(clan["pollingChannelId"])
+                            if "pollingChannelId" in clan
+                            else None
+                        )
+                        polling_channel_name = (
+                            clan["pollingChannelName"]
+                            if "pollingChannelName" in clan
+                            else None
+                        )
+                        update_on_start = (
+                            clan["updateOnStart"] if "updateOnStart" in clan else False
+                        )
+
+                        clans.append(
+                            ClanBattleNotificationConfigClan(
+                                leader_viewer_id,
+                                guild_id,
+                                channel_id,
+                                thread_id,
+                                cron,
+                                polling_channel_id,
+                                polling_channel_name,
+                                update_on_start,
+                            )
+                        )
+
+                    self.__env.clan_battle_notification = ClanBattleNotificationConfig(
+                        clans
+                    )
+
+            if "botClanId" in data:
+                self.__env.bot_clan_id = data["botClanId"]
+
     @classmethod
     def config_file_name(cls) -> str:
         return cls.__JSON_CONFIG
@@ -206,7 +300,6 @@ class EnvironmentVariableLoader:
                 clans[index].boss_channels.append(
                     ChannelConfig(int(channel_id), int(env_boss_health))
                 )
-
         self.__env.clans = clans
 
     def __load_mongo(self):
@@ -237,11 +330,15 @@ class EnvironmentVariableLoader:
 config = BotConfiguration()
 
 
-def init():
+def init(dir: str = ""):
     """
     初始化環境變數
     """
-    global config
+    global config, root_dir
+
+    # Binding the root directory
+    root_dir = dir
+
     # Check if the config file exists
     print("Try loading config.json...")
     if os.path.exists(JsonConfigLoader.config_file_name()):
@@ -374,3 +471,17 @@ def website_url() -> str | None:
     取得戰隊戰作業製圖網站的URL
     """
     return config.website_url
+
+
+def clan_battle_notification() -> ClanBattleNotificationConfig | None:
+    """
+    取得戰隊戰通知的設定
+    """
+    return config.clan_battle_notification
+
+
+def bot_clan_id() -> int | None:
+    """
+    取得機器人戰隊的戰隊ID
+    """
+    return config.bot_clan_id

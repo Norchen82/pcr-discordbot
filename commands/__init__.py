@@ -1,8 +1,10 @@
 from discord import app_commands
 import discord
+
 from discord import app_commands
 from module import cfg
 from bot import client
+
 from commands import (
     broadcast_add,
     broadcast_list,
@@ -12,6 +14,7 @@ from commands import (
     go,
     history,
     img,
+    subscribe,
     rm,
 )
 
@@ -162,7 +165,8 @@ async def command_history(
 async def command_img(interaction: discord.Interaction):
     try:
         await img.do_command(interaction)
-    except Exception:
+    except Exception as err:
+        print(err)
         await interaction.response.edit_message(
             content="發生錯誤", view=None, delete_after=5
         )
@@ -177,6 +181,21 @@ async def command_rm(interaction: discord.Interaction):
     try:
         await rm.do_command(interaction)
     except Exception:
+        await interaction.response.edit_message(
+            content="發生錯誤", view=None, delete_after=5
+        )
+
+
+@tree.command(
+    name="subscribe",
+    description="通知設定",
+    guild=discord.Object(id=cfg.guild_id()),
+)
+async def command_subscribe(interaction: discord.Interaction):
+    try:
+        await subscribe.do_command(interaction)
+    except Exception as err:
+        print(err)
         await interaction.response.edit_message(
             content="發生錯誤", view=None, delete_after=5
         )

@@ -168,3 +168,10 @@ config.*.json
 dockerfile
 docker-compose.yml
 
+# PCRJJC files
+frame.json
+headers.json
+*.playerprefs.xml
+
+# Test files
+user-data.json
