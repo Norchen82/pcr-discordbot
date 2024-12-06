@@ -1,5 +1,4 @@
 import asyncio
-import random
 import discord
 from typing import Awaitable, Callable
 from discord import Client, Intents
@@ -16,11 +15,8 @@ client = Client(intents=intents)
 # 註冊指令的初始化函式
 _register_commands: Callable[[], Awaitable[int]] | None = None
 
-# 排程
-on_jjc_notify: Callable[[], Awaitable[int]] | None = None
-
-# 排程2
-on_clan_battle_notify: Callable[[], Awaitable[int]] | None = None
+# 協程迴圈動作
+coroutine_loop_action: Callable[[], Awaitable[int]] | None = None
 
 
 def init(register_commands: Callable[[], Awaitable[int]] | None = None):
@@ -52,25 +48,7 @@ async def on_ready():
         cmd_count = await _register_commands()
         print(f"{cmd_count} commands registered.")
 
-    # 競技場通知排程
-    async def jjc_notify():
-        while True:
-            if on_jjc_notify is not None:
-                await on_jjc_notify()
-
-            await asyncio.sleep(180 + (random.randrange(-10, 10, 1)))
-
-    # 戰隊戰通知排程
-    async def clan_battle_notify():
-        while True:
-            if on_clan_battle_notify is not None:
-                await on_clan_battle_notify()
-
-            await asyncio.sleep(60)
-
-    # Start the cron job
-    client.loop.create_task(jjc_notify())
-    client.loop.create_task(clan_battle_notify())
+    await start_coroutine_loop()
 
     print(f"Logged on as {client.user}")
 
@@ -107,3 +85,18 @@ async def on_message(message: discord.Message):
     except Exception as ex:
         print(ex)
         pass
+
+
+async def start_coroutine_loop() -> None:
+    """
+    啟動協程迴圈
+    """
+
+    async def coroutine_loop():
+        while True:
+            if coroutine_loop_action is not None:
+                await coroutine_loop_action()
+
+            await asyncio.sleep(1)
+
+    client.loop.create_task(coroutine_loop())

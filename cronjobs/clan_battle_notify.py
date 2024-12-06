@@ -1,4 +1,3 @@
-import bot
 import pytz
 import random
 import calendar
@@ -197,6 +196,3 @@ async def modify_polling_channel_name(
 
     name = format.replace("{rank}", str(rank))
     await channel.edit(name=name)
-
-
-bot.on_clan_battle_notify = on_clan_battle_notify

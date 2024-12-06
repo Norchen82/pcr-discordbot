@@ -127,6 +127,3 @@ async def notify_activity(
 
         await user.send(f"玩家**{player_name}**已於{since_str}前上線。")
         return
-
-
-bot.on_jjc_notify = on_jjc_notify
