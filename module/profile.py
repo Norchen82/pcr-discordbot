@@ -1,32 +1,4 @@
-# type: ignore
-import pymongo
-import discord
-
-import module.cfg as cfg
-import urllib.parse
-import pickle
-
-
-protocol = cfg.mongo_protocol()
-host = cfg.mongo_host()
-port = cfg.mongo_port()
-user_name = cfg.mongo_user()
-password = cfg.mongo_password()
-
-connection_str = ""
-if protocol == "mongodb+srv":
-    connection_str = f"mongodb+srv://{user_name}:{password}@{host}"
-elif protocol == "mongodb":
-    connection_str = (
-        f"mongodb://{user_name}:{urllib.parse.quote_plus(password)}@{host}:{port}"
-    )
-
-client: pymongo.MongoClient | None = None
-db: pymongo.database.Database | None = None
-
-if connection_str != "":
-    client = pymongo.MongoClient(connection_str)
-    db = client.bot
+from libs.mongo import db
 
 
 class Subscription:
