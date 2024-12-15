@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import Any, Coroutine
 from cronjobs.jjc_notify import on_jjc_notify
 from cronjobs.clan_battle_notify import on_clan_battle_notify
+from cronjobs.clan_battle_guide_publish import on_clan_battle_guide_publish
 
 
 class CronJob:
@@ -11,12 +12,16 @@ class CronJob:
         name: str,
         interval: int,
         coroutine: Coroutine[Any, Any, None],
+        immediate: bool = False,
     ):
         self.name = name
         self.interval = interval
         self.coroutine = coroutine
 
-        self.next_run = datetime.now() + timedelta(seconds=interval)
+        if immediate:
+            self.next_run = datetime.now()
+        else:
+            self.next_run = datetime.now() + timedelta(seconds=interval)
 
     async def run(self):
         await self.coroutine
@@ -26,6 +31,9 @@ class CronJob:
 jobs: list[CronJob] = [
     CronJob("jjc_notify", 180, on_jjc_notify()),
     CronJob("clan_battle_notify", 60, on_clan_battle_notify()),
+    CronJob(
+        "clan_battle_guide_publish", 60, on_clan_battle_guide_publish(), immediate=True
+    ),
 ]
 
 
