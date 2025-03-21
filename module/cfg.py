@@ -90,6 +90,8 @@ class BotConfiguration:
         mongo: MongoDbConfig | None = None,
         clan_battle_notification: ClanBattleNotificationConfig | None = None,
         bot_clan_id: int | None = None,
+        api_key: str | None = None,
+        api_host: str | None = None,
     ):
         self.bot_token = bot_token
         self.guild_id = guild_id
@@ -100,6 +102,8 @@ class BotConfiguration:
         self.mongo = mongo
         self.clan_battle_notification = clan_battle_notification
         self.bot_clan_id = bot_clan_id
+        self.api_key = api_key
+        self.api_host = api_host
 
 
 class JsonConfigLoader:
@@ -242,6 +246,12 @@ class JsonConfigLoader:
 
             if "botClanId" in data:
                 self.__env.bot_clan_id = data["botClanId"]
+
+            if "apiKey" in data:
+                self.__env.api_key = data["apiKey"]
+
+            if "apiHost" in data:
+                self.__env.api_host = data["apiHost"]
 
     @classmethod
     def config_file_name(cls) -> str:
@@ -485,3 +495,17 @@ def bot_clan_id() -> int | None:
     取得機器人戰隊的戰隊ID
     """
     return config.bot_clan_id
+
+
+def api_key() -> str | None:
+    """
+    取得API的鑰匙
+    """
+    return config.api_key
+
+
+def api_host() -> str | None:
+    """
+    取得API的主機名稱
+    """
+    return config.api_host

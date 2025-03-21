@@ -44,22 +44,14 @@ async def on_clan_battle_notify():
 def need_update_clan_ranking(clan: cfg.ClanBattleNotificationConfigClan, now: datetime):
     global last_clan_ranking_times
 
+    if not is_during_clan_battle(now):
+        return False
+
     if clan.leader_viewer_id not in last_clan_ranking_times:
         return True
 
     last_time = last_clan_ranking_times[clan.leader_viewer_id]
     diff = now - last_time
-
-    # 判斷是否為戰隊戰期間
-    _, number_of_days = calendar.monthrange(now.year, now.month)
-    start_time = datetime(
-        now.year, now.month, number_of_days - 4, 5, 0, 0, tzinfo=pytz.timezone("ROC")
-    )
-    end_time = datetime(
-        now.year, now.month + 1, 1, 0, 0, 0, tzinfo=pytz.timezone("ROC")
-    )
-    if not (start_time <= now < end_time):
-        return False
 
     if diff.total_seconds() >= 1800:
         return True
@@ -73,24 +65,18 @@ def need_update_clan_ranking(clan: cfg.ClanBattleNotificationConfigClan, now: da
 def need_notify_clan_ranking(clan: cfg.ClanBattleNotificationConfigClan, now: datetime):
     global last_clan_ranking_times
 
+    if not is_during_clan_battle(now):
+        return False
+
+    # 這裡必須要是False，否則會在戰隊戰剛開始時，就推送一次
     if clan.leader_viewer_id not in last_clan_ranking_times:
         return False
 
     last_time = last_clan_ranking_times[clan.leader_viewer_id]
     diff = now - last_time
 
-    # 判斷是否為戰隊戰期間
-    _, number_of_days = calendar.monthrange(now.year, now.month)
-    start_time = datetime(
-        now.year, now.month, number_of_days - 4, 5, 0, 0, tzinfo=pytz.timezone("ROC")
-    )
-    end_time = datetime(
-        now.year, now.month + 1, 1, 0, 0, 0, tzinfo=pytz.timezone("ROC")
-    )
-    if not (start_time <= now < end_time):
-        return False
-
     # 如果是最後一天，強制在23:20跟23:50推送
+    _, number_of_days = calendar.monthrange(now.year, now.month)
     force_push = now.day == number_of_days and now.hour == 23 and now.minute >= 20
 
     if force_push or clan.cron is None:
@@ -123,6 +109,24 @@ def time_period_group(time: datetime) -> int:
         return 20
     else:
         return 50
+
+
+def is_during_clan_battle(now: datetime) -> bool:
+    """
+    判斷是否為戰隊戰期間
+    """
+    _, number_of_days = calendar.monthrange(now.year, now.month)
+    start_time = datetime(
+        now.year, now.month, number_of_days - 4, 5, 0, 0, tzinfo=pytz.timezone("ROC")
+    )
+    year = now.year
+    month = now.month + 1
+    if month > 12:
+        year += 1
+        month = 1
+
+    end_time = datetime(year, month, 1, 0, 0, 0, tzinfo=pytz.timezone("ROC"))
+    return start_time <= now < end_time
 
 
 async def search_clan_ranking(
@@ -162,6 +166,7 @@ async def search_clan_ranking(
                             )
 
                         if not need_notify_clan_ranking(clan, now):
+                            last_clan_ranking_times[clan.leader_viewer_id] = now
                             continue
 
                         if clan.channel_id != None:

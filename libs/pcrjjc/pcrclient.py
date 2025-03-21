@@ -23,7 +23,7 @@ default_headers = {
     "Content-Type": "application/octet-stream",
     "Expect": "100-continue",
     "X-Unity-Version": "2021.3.20f1",
-    "APP-VER": "4.7.0",
+    "APP-VER": "4.9.0",
     "BATTLE-LOGIC-VERSION": "4",
     "BUNDLE-VER": "",
     "DEVICE": "2",
