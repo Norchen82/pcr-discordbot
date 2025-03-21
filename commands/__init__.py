@@ -16,6 +16,7 @@ from commands import (
     img,
     subscribe,
     rm,
+    tr,
 )
 
 tree = app_commands.CommandTree(client)
@@ -199,3 +200,12 @@ async def command_subscribe(interaction: discord.Interaction):
         await interaction.response.edit_message(
             content="發生錯誤", view=None, delete_after=5
         )
+
+
+@tree.command(
+    name="tr",
+    description="文字軸補償秒數轉換",
+    guild=discord.Object(id=cfg.guild_id()),
+)
+async def command_tr(interaction: discord.Interaction):
+    await tr.do_command(interaction)

@@ -2,7 +2,7 @@ import asyncio
 import discord
 from typing import Awaitable, Callable
 from discord import Client, Intents
-from module import cfg, msg, atkcheckin
+from module import cfg, msg, atkcheckin, tr
 
 # 機器人的意圖
 intents = Intents.default()
@@ -58,6 +58,23 @@ async def on_message(message: discord.Message):
     try:
         if message.author == client.user:
             return
+
+        # 如果是時間軸調整指令，就進行時間軸調整
+        tr_command = tr.parse_command(message.content)
+        if tr_command is not None:
+            result = tr.adjust_timeline(tr_command.remaining_time, tr_command.timeline)
+            if result != "":
+                writer = msg.DiscordMessageWriter(message)
+                await writer.write(
+                    f"""
+```cs
+{result}
+```
+"""
+                )
+            else:
+                writer = msg.DiscordMessageWriter(message)
+                await writer.write("轉換結果已經為空")
 
         # 如果非報刀區的頻道，就不處理
         if cfg.boss_health(message.channel.id) == None:
